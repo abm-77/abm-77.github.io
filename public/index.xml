@@ -2,17 +2,17 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>abm</title>
-    <link>https://example.org/</link>
+    <link>http://localhost:1313/</link>
     <description>Recent content on abm</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Tue, 16 Jul 2024 18:39:15 -0700</lastBuildDate>
-    <atom:link href="https://example.org/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1</title>
-      <link>https://example.org/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</link>
+      <link>http://localhost:1313/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</link>
       <pubDate>Tue, 16 Jul 2024 18:39:15 -0700</pubDate>
-      <guid>https://example.org/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</guid>
+      <guid>http://localhost:1313/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</guid>
       <description>Background Recently, I&amp;rsquo;ve been pretty into debuggers. With the recent development of the RAD Debugger Project, RemedyBG&amp;rsquo;s continued existence, and smaller projects like Spray, I became interested in how they work under the hood. So I set out to try to craft a (simple) debugger on my own. Unfortunately, I decided to start at the harder part of crafting a debugger, parsing ELF and DWARF. Ok, to be fair, they are not ESPECIALLY difficult, but there is a severe lack of resources available on the subject (please correct me if I&amp;rsquo;m wrong here).</description>
     </item>
   </channel>
