@@ -2,23 +2,23 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://localhost:1313/</loc>
+    <loc>https://example.org/</loc>
     <lastmod>2024-07-16T18:39:15-07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</loc>
+    <loc>https://example.org/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</loc>
     <lastmod>2024-07-16T18:39:15-07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/programming/</loc>
+    <loc>https://example.org/programming/</loc>
     <lastmod>2024-07-16T18:39:15-07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/health/</loc>
+    <loc>https://example.org/health/</loc>
     <lastmod>2024-06-20T23:25:27-04:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/music/</loc>
+    <loc>https://example.org/music/</loc>
     <lastmod>2024-06-20T23:20:52-04:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/categories/</loc>
+    <loc>https://example.org/categories/</loc>
   </url><url>
-    <loc>http://localhost:1313/tags/</loc>
+    <loc>https://example.org/tags/</loc>
   </url>
 </urlset>
