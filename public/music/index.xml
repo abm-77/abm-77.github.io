@@ -2,18 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Musics on abm</title>
-    <link>http://localhost:1313/music/</link>
+    <link>https://example.org/music/</link>
     <description>Recent content in Musics on abm</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 20 Jun 2024 23:20:52 -0400</lastBuildDate>
-    <atom:link href="http://localhost:1313/music/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>What Ive Been Practicing - 001</title>
-      <link>http://localhost:1313/music/what-ive-been-practicing-001/</link>
-      <pubDate>Thu, 20 Jun 2024 23:20:52 -0400</pubDate>
-      <guid>http://localhost:1313/music/what-ive-been-practicing-001/</guid>
-      <description>A Little Background Since coming home from school, I&amp;rsquo;ve had a lot more time to practice the drums (yay)! For context, I&amp;rsquo;ve been playing the drum set since 7th grade. I started off learning West African drumming, the steel pans and even traditional Japanese taiko drumming. In high school, I played in Jazz Band, Gospel Band, Symphonic Band, and even the marching band as a snare drummer. I thought I would not play in college, but I was convinced by a friend of mine to audition for an on-campus, R&amp;amp;B/Jass/Hip-Hop group called &amp;ldquo;Love, and a Sandwich.</description>
-    </item>
+    <lastBuildDate></lastBuildDate>
+    <atom:link href="https://example.org/music/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
