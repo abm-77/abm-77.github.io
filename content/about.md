@@ -1,7 +1,7 @@
 +++
 title = 'About'
 date = 2024-06-20T22:41:15-04:00
-draft = true
+draft = false
 +++
 
 **Bryson Miller**: Software Engineer based in SF. Interested in low-level programming, performance, systems. Outside of programming I love drumming and working out.

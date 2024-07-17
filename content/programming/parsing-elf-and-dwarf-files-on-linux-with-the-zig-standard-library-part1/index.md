@@ -1,7 +1,7 @@
 +++
 title = 'Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1'
 date = 2024-07-16T18:39:15-07:00
-draft = true
+draft = false
 +++
 
 # Background

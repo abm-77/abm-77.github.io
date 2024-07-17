@@ -1,7 +1,7 @@
 +++
 title = 'Howdy, world!'
 date = 2024-06-20T22:45:01-04:00
-draft = true
+draft = false
 +++
 
 Howdy, world. My name is Bryson Miller, and this is my personal website. Here I will be discussing topics in the fields of programming, music, and health. 

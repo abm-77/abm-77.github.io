@@ -2,11 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Musics on abm</title>
-    <link>https://example.org/music/</link>
+    <link>http://localhost:1313/music/</link>
     <description>Recent content in Musics on abm</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate></lastBuildDate>
-    <atom:link href="https://example.org/music/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/music/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
