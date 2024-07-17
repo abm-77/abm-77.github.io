@@ -6,7 +6,14 @@
     <description>Recent content on abm</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate></lastBuildDate>
+    <lastBuildDate>Tue, 16 Jul 2024 18:39:15 -0700</lastBuildDate>
     <atom:link href="https://example.org/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1</title>
+      <link>https://example.org/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</link>
+      <pubDate>Tue, 16 Jul 2024 18:39:15 -0700</pubDate>
+      <guid>https://example.org/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</guid>
+      <description>Background Recently, I&amp;rsquo;ve been pretty into debuggers. With the recent development of the RAD Debugger Project, RemedyBG&amp;rsquo;s continued existence, and smaller projects like Spray, I became interested in how they work under the hood. So I set out to try to craft a (simple) debugger on my own. Unfortunately, I decided to start at the harder part of crafting a debugger, parsing ELF and DWARF. Ok, to be fair, they are not ESPECIALLY difficult, but there is a severe lack of resources available on the subject (please correct me if I&amp;rsquo;m wrong here).</description>
+    </item>
   </channel>
 </rss>
