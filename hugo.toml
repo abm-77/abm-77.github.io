@@ -1,0 +1,11 @@
+baseURL = 'https://example.org/'
+languageCode = 'en-us'
+title = 'abm'
+theme = 'basics'
+
+
+[parmas]
+  author = "Bryson Miller"
+
+
+

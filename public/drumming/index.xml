@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Drummings on abm-77</title>
+    <link>http://localhost:1313/drumming/</link>
+    <description>Recent content in Drummings on abm-77</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 20 Jun 2024 23:20:52 -0400</lastBuildDate>
+    <atom:link href="http://localhost:1313/drumming/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>What Ive Been Practicing 001</title>
+      <link>http://localhost:1313/drumming/what-ive-been-practicing-001/</link>
+      <pubDate>Thu, 20 Jun 2024 23:20:52 -0400</pubDate>
+      <guid>http://localhost:1313/drumming/what-ive-been-practicing-001/</guid>
+      <description></description>
+    </item>
+  </channel>
+</rss>

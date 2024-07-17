@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com">
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+
+        <link href="https://fonts.googleapis.com/css?family=Ubuntu|Ubuntu+Mono" rel="stylesheet">
+
+        <title>Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1</title>
+
+        <link rel="stylesheet" href="/css/stylesheet.css">
+
+        
+
+        
+
+    </head>
+    <body>
+      <div class="container-fluid">
+        <nav class="navbar navbar-expand-md navbar-light">
+
+          
+          <span class="navbar-brand mb-0 h1"></span>
+
+          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle Navigation" name="button">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+
+          <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+            <div class="navbar-nav">
+              <a class="nav-item nav-link " href="/">home</a>
+              <a class="nav-item nav-link " href="/programming/">programming</a>
+              <a class="nav-item nav-link " href="/music/">music</a>
+              <a class="nav-item nav-link " href="/health/">health</a>
+              <a class="nav-item nav-link " href="/about/">about</a>
+            </div>
+          </div>
+        </nav>
+
+        <section id="page-title">
+          <h1><a href="/">abm</a></h1>
+        </section>
+
+
+<article class="blog-post">
+  <h1>Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1</h1>
+  <div class="blog-post-content">
+    <h1 id="background">Background</h1>
+<p>Recently, I&rsquo;ve been pretty into debuggers. With the recent development of the <a href="https://github.com/EpicGamesExt/raddebugger/">RAD Debugger Project</a>, <a href="https://remedybg.itch.io/remedybg">RemedyBG&rsquo;s</a> continued existence, and smaller projects like <a href="https://github.com/thass0/spray">Spray</a>, I became interested in how they work under the hood. So I set out to try to craft a (simple) debugger on my own. Unfortunately, I decided to start at the harder part of crafting a debugger, parsing ELF and DWARF. Ok, to be fair, they are not ESPECIALLY difficult, but there is a severe lack of resources available on the subject (please correct me if I&rsquo;m wrong here). There are some libraries such as <a href="https://github.com/aclements/libelfin">libelfin</a> and <a href="https://github.com/gimli-rs/gimli">gimli</a>, but they are language dependent (C++ and Rust, respectively). I knew I wanted to use <a href="https://ziglang.org/">Zig</a> for the project just to get some more practice with the langauge. Therefore, I decided to use libelf and libdwarf, C libraries for parsing ELF and DWARF files. Zig has excellent C interop, so I was not concerned about pulling the libraries in. After I had started working on the scaffolding for the parser, I stumbled across some interesting entries in the Zig Standard Libary (ZSL) Documentation. As it would turn out, the ZSL has functions to help parse <a href="https://ziglang.org/documentation/master/std/#std.elf">ELF</a> and <a href="https://ziglang.org/documentation/master/std/#std.dwarf">DWARF</a> files! The only issue was, like much of the rest of the non-trivial parts of the ZSL, it had very little documentation. Looking at the source code, I was able to reverse engineer a bit how the systems work and use them to get some pretty good results. I wanted to share them here in the hopes that others could learn. This will not be a tutorial on understanding the ELF or DWARF formats, merely just going over my approach to parsing them via the ZSL. I&rsquo;ve included more resources on understanding ELF, DWARF, and debuggers in general in the <a href="">Resources</a> section of this post. This will also not be a Zig tutorial, but as the post is largely Zig focused, I would recommend you at least familiarize yourself with the language.</p>
+<h1 id="disclaimer">Disclaimer</h1>
+<p>I have been learning Zig consistently for like a month now, so my Zig my not be the most idiomatic. If there places it can be improved, please feel free to do so! I also do not consider myself an expert on ELF or DWARF, I just wanted to document my findings in the case they could be useful to the broader community.</p>
+<h1 id="setup">Setup</h1>
+<p>Suppose we have some file, <code>test.c</code> with the following contents:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdio.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">add</span>(<span style="color:#66d9ef">int</span> a, <span style="color:#66d9ef">int</span> b) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> a <span style="color:#f92672">+</span> b;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">main</span> (<span style="color:#66d9ef">void</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> c <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> d <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;%d + %d = %d</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">, c, d, add(c, d));</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We have a simple C program that adds two numbers together and prints the result. The contents of the program are not really that important, but now we have something to compile.</p>
+<p>We can then compile this with clang (or gcc) with the following command: <code>clang test.c -o test -g</code> which will generate an executable file <code>test</code>. The <code>-g</code> indicates that we are also generating debug information for the program.</p>
+<p>To verify that we compiled the code successfully, we can run <code>readelf -h test</code> to inspect the ELF header of the executable we compiled. We should get something like this:</p>
+<p><img src="images/elf-header.png" alt="Elf Header"></p>
+<p>We can also run <code>readelf -S test</code> to view the sections of the ELF file. We should see some sections labled &ldquo;.debug_*&rdquo;:</p>
+<p><img src="images/debug-info.png" alt="Debug Info"></p>
+<h1 id="parsing-elf">Parsing ELF</h1>
+<p>Cool, so now have a an executable file with debug information. You might now be asking, &ldquo;If we just want to get the DWARF debug information, why do we even need to parse the ELF?&rdquo; Well that&rsquo;s because the DWARF debug information is inside the ELF information! As a result, we need to do some basic ELF section parsing, at least to the point of looking up arbitrary sections in the file.</p>
+<h3 id="-aside-1-the-path-less-travelled">=&gt; Aside #1: The Path Less Travelled</h3>
+<p>I opted to not use <a href="https://ziglang.org/documentation/master/std/#std.elf.Header.section_header_iterator"><code>std.elf.Header.section_header_iterator</code></a> because I preferred having a slice over the data rather than an iterator, but you can use it if you&rsquo;d like. It may actually be more efficient, I&rsquo;m not sure.</p>
+<h3 id="-back-to-parsing">&lt;= Back to Parsing</h3>
+<p>To begin, let&rsquo;s define some types:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">const</span> std <span style="color:#f92672">=</span> @import(<span style="color:#e6db74">&#34;std&#34;</span>);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> fs <span style="color:#f92672">=</span> std.fs;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> elf <span style="color:#f92672">=</span> std.elf; <span style="color:#75715e">// ELF library
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">const</span> dwarf <span style="color:#f92672">=</span> std.dwarf; <span style="color:#75715e">// DWARF library
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> Buffer <span style="color:#f92672">=</span> []<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">u8</span>; 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> ElfSectionHeaderList <span style="color:#f92672">=</span> []elf.Elf64_Shdr; <span style="color:#75715e">// slice of ELF section headers
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// errors occuring while parsing 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">const</span> ElfError <span style="color:#f92672">=</span> <span style="color:#66d9ef">error</span>{
+</span></span><span style="display:flex;"><span>    CouldNotFindTableIndices,
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// indices of commonly used ELF sections 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">const</span> ElfSectionTableIndices <span style="color:#f92672">=</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>    symbol_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span>,
+</span></span><span style="display:flex;"><span>    string_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span>,
+</span></span><span style="display:flex;"><span>    section_name_string_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span>,
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// organizes ELF section information
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">const</span> ElfSectionTable <span style="color:#f92672">=</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>    headers<span style="color:#f92672">:</span> ElfSectionHeaderList,
+</span></span><span style="display:flex;"><span>    table_indices<span style="color:#f92672">:</span> ElfSectionTableIndices,
+</span></span><span style="display:flex;"><span>    symbol_table<span style="color:#f92672">:</span> []elf.Elf64_Sym, <span style="color:#75715e">// slice of ELF symbols
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    string_table<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>,
+</span></span><span style="display:flex;"><span>    section_name_string_table<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>,
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// organizes all ELF information
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">const</span> ElfInfo <span style="color:#f92672">=</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> Self <span style="color:#f92672">=</span> @This();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    elf_header<span style="color:#f92672">:</span> elf.Header, <span style="color:#75715e">// the ELF header itself
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    section_table<span style="color:#f92672">:</span> ElfSectionTable,
+</span></span><span style="display:flex;"><span>    data<span style="color:#f92672">:</span> Buffer,
+</span></span><span style="display:flex;"><span>    allocator<span style="color:#f92672">:</span> std.mem.Allocator,
+</span></span><span style="display:flex;"><span>};
+</span></span></code></pre></div><p>These will all store different relevant information to about the ELF file (if you want to know what the relevant information is, take a look at the ELF spec in the Resources section). At a high level, the ELF file contains one main list we are concerned with called the section header list. For our intents and purposes, we only really care about the section header list (and not the program header list) because this is where we will get our debug information from (those .debug_* lines you saw earlier). So our goal now is to be able to look up the debug sections from the ELF file.</p>
+<p>To begin, we need to parse the ELF header itself. This header is neither a program or section header, but it does ensure that we have a properly formatted ELF file and the location of where the section header list starts. <a href="https://ziglang.org/documentation/master/std/#std.elf.Header.read"><code>std.elf.Header.read</code></a> is a function that, given a file handle, will parse the ELF header for us. Let&rsquo;s start an init function inside of ELF info:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> init(allocator<span style="color:#f92672">:</span> std.mem.Allocator, path<span style="color:#f92672">:</span> []<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">u8</span>) <span style="color:#f92672">!</span>ElfInfo {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> fd <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fs.cwd().openFile(path, .{});
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> fd.close();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> stat <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fd.stat();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> bytes <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> allocator.alloc(<span style="color:#66d9ef">u8</span>, stat.size);
+</span></span><span style="display:flex;"><span>    _ <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fd.readAll(bytes);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> elf_header <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> elf.Header.read(fd);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="-aside-2-sectiontable-vs-sectiontable-header">=&gt; Aside #2: Section/Table vs Section/Table Header</h3>
+<p>You might be wondering why I am going through great lengths to distinguish between &ldquo;section/table&rdquo; and &ldquo;section/table header.&rdquo; It is because they are different! Each section is prepended by a header that has information about that section such as its size and offset into the file. The section istelf is where the real data is.</p>
+<h3 id="-back-to-parsing-1">&lt;= Back to Parsing</h3>
+<p>Here we read out the ELF header using the aforementioned function, we also read out the files bytes for later processing. <code>elf_header</code> has a member variable <code>shoff</code> that will tell us the Section Header OFFset, or how many bytes into our <code>bytes</code> array we need to go until we get to the first section header (once again, you can simply just use <code>std.elf.Header.section_header_iterator</code> to directly get an iterator over the different section headers). We can also get the number of section headers from the <code>shnum</code> member variable. Working with raw bytes is not ideal so let&rsquo;s make a helper function that will convert from raw bytes, to a slice of a given type:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> sliceAtOffset(<span style="color:#66d9ef">comptime</span> T<span style="color:#f92672">:</span> <span style="color:#66d9ef">type</span>, buffer<span style="color:#f92672">:</span> []<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">u8</span>, offset<span style="color:#f92672">:</span> <span style="color:#66d9ef">u64</span>, count<span style="color:#f92672">:</span> <span style="color:#66d9ef">u64</span>) []T {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> ptr <span style="color:#f92672">=</span> @intFromPtr(buffer.ptr) <span style="color:#f92672">+</span> offset;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> @as([<span style="color:#f92672">*</span>]T, @ptrFromInt(ptr))[<span style="color:#ae81ff">0</span>..count];
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p><code>sliceAtOffset</code>, given a type <code>T</code>, a byte buffer, an offset into the buffer, and the number of <code>T</code>s we want in the slice, will return a length <code>count</code> slice of <code>T</code>s. Shout out this <a href="https://www.reddit.com/r/Zig/comments/rl0osa/slice_of_structs_from_a_slice_of_bytes/">Reddit post</a>.</p>
+<p>We can then say something like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> section_headers <span style="color:#f92672">=</span> sliceAtOffset(elf.Elf64_Shdr, bytes, elf_header.shoff, elf_header.shnum);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>where <code>elf.Elf64_Shdr</code>, is the ZSL representation for the ELF section header.</p>
+<p>We now have a slice of all the section headers (or an iterator if you chose the alternate route).</p>
+<p>Unfortunately for us, sometimes the ELF header does not actually have the correct information.</p>
+<p>According to the <a href="https://www.man7.org/linux/man-pages/man5/elf.5.html">elf manpage</a>: &ldquo;If the number of entries in the section header table is larger than or equal to <code>SHN_LORESERVE (0xff00)</code>, <code>e_shnum</code> holds the value zero and the real number of entries in the section header table is held in the <code>sh_size</code> member of the initial entry in section header table.  Otherwise, the <code>sh_size</code> member of the initial entry in the section header table holds the value zero.&rdquo;</p>
+<p>All this is to say, if <code>e_shnum == 0</code>, we need to resize our slice to have a length of the initial section header&rsquo;s <code>sh_size</code> field:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> initial_section_header <span style="color:#f92672">=</span> section_headers[<span style="color:#ae81ff">0</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> n_section_headers <span style="color:#f92672">=</span> <span style="color:#66d9ef">if</span> (elf_header.shnum <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) initial_section_header.sh_size <span style="color:#66d9ef">else</span> elf_header.shnum;
+</span></span><span style="display:flex;"><span>    section_headers.len <span style="color:#f92672">=</span> n_section_headers;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Now that our section header slice is accurate, we can start to look up sections in it.</p>
+<p>There are 3 important sections that we will need to locate first before we can write a generalizable lookup function: the section name string table, the symbol table, and the string table. The section name string table contains the names of all of the sections. It is separate and not to be confused with the string table, which holds string information for the rest of the program (such as symbol names). The symbol table is what actually holds the symbol information for the program.</p>
+<p>To start, we retrieve the section name string table (because we want to look up the symbol and string tables by name). Luckily for us, the ELF header tells us the exact index of the section name string table header in <code>shstrndx</code> (what a mouthful). We can get the table header like so:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table_header <span style="color:#f92672">=</span> section_headers[elf_header.shstrndx];
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>But wait! Remember how <code>e_shnum</code> can sometimes be wrong if there are too many entries in the section header list? Well something similar can happen here if the section name string table is too large. We should then modify the above code to:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table_index <span style="color:#f92672">=</span> <span style="color:#66d9ef">if</span> (elf_header.shstrndx <span style="color:#f92672">==</span> <span style="color:#ae81ff">0xffff</span>) initial_section_header.sh_link <span style="color:#66d9ef">else</span> elf_header.shstrndx;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table_header <span style="color:#f92672">=</span> section_headers[section_name_string_table_index];
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>and to get the actual table itself we just do:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table <span style="color:#f92672">=</span> bytes[section_name_string_table_header.sh_offset..];
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>where <code>sh_offset</code> is the offset into the <code>bytes</code> array where the table actually starts.</p>
+<h3 id="-aside-3-measure-twice-cut-once">=&gt; Aside #3: Measure Twice, Cut Once</h3>
+<p>In the above code sections, we used <code>sliceAtOffset</code> for <code>symbol_table</code> but take a normal slice for <code>string_table</code>. What gives? Well, there are a two main reasons for this:</p>
+<ol>
+<li>We don&rsquo;t actually know how many strings there are or the individual lengths of any strings within the string table.</li>
+<li>Considering the string table is just characters anyway, there&rsquo;s nothing to convert it to.</li>
+</ol>
+<p>How do we determine how long a string in a string table is? Well since we are only performing look-ups with a given reference string, we can use that reference string for comparison and to determine the id length of the string from the table if it were a match.</p>
+<h3 id="-back-to-parsing-2">&lt;= Back to Parsing</h3>
+<p>Now that we have the section name string table, we can locate the symbol and string tables. Let&rsquo;s add an init function to <code>ElfTableIndices</code> along with some string matching helper functions:</p>
+<p>at file scope:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">const</span> Validator <span style="color:#f92672">=</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> nameEql(desired_name<span style="color:#f92672">:</span> []<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">u8</span>, name_from_file<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>) <span style="color:#66d9ef">bool</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">const</span> n <span style="color:#f92672">=</span> name_from_file[<span style="color:#ae81ff">0</span>..desired_name.len];
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> std.mem.eql(<span style="color:#66d9ef">u8</span>, desired_name, n);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> isSymbolTable(shdr<span style="color:#f92672">:</span> elf.Elf64_Shdr, name<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>) <span style="color:#66d9ef">bool</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> nameEql(<span style="color:#e6db74">&#34;.symtab&#34;</span>, name) <span style="color:#66d9ef">and</span>
+</span></span><span style="display:flex;"><span>            shdr.sh_type <span style="color:#f92672">==</span> elf.SHT_SYMTAB <span style="color:#66d9ef">and</span>
+</span></span><span style="display:flex;"><span>            shdr.sh_flags <span style="color:#f92672">&amp;</span> elf.SHF_ALLOC <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#66d9ef">and</span>
+</span></span><span style="display:flex;"><span>            shdr.sh_entsize <span style="color:#f92672">==</span> @sizeOf(elf.Elf64_Sym);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> isStringTable(shdr<span style="color:#f92672">:</span> elf.Elf64_Shdr, name<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>) <span style="color:#66d9ef">bool</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> nameEql(<span style="color:#e6db74">&#34;.strtab&#34;</span>, name) <span style="color:#66d9ef">and</span>
+</span></span><span style="display:flex;"><span>            shdr.sh_type <span style="color:#f92672">==</span> elf.SHT_STRTAB <span style="color:#66d9ef">and</span>
+</span></span><span style="display:flex;"><span>            shdr.sh_flags <span style="color:#f92672">&amp;</span> elf.SHF_ALLOC <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>};
+</span></span></code></pre></div><p>inside of <code>ElfTableIndices</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> init(
+</span></span><span style="display:flex;"><span>    n_headers<span style="color:#f92672">:</span> <span style="color:#66d9ef">u64</span>,
+</span></span><span style="display:flex;"><span>    section_headers<span style="color:#f92672">:</span> []elf.Elf64_Shdr,
+</span></span><span style="display:flex;"><span>    section_name_string_table<span style="color:#f92672">:</span> []<span style="color:#66d9ef">u8</span>,
+</span></span><span style="display:flex;"><span>    section_name_string_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span>,
+</span></span><span style="display:flex;"><span>) <span style="color:#f92672">!</span>ElfTableIndices {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> i<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span> <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> symbol_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span> <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> string_table_index<span style="color:#f92672">:</span> <span style="color:#66d9ef">u32</span> <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (i <span style="color:#f92672">&lt;</span> n_headers <span style="color:#66d9ef">and</span> (symbol_table_index <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#66d9ef">or</span> string_table_index <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)) <span style="color:#f92672">:</span> (i <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">const</span> hdr <span style="color:#f92672">=</span> section_headers[i];
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">const</span> name <span style="color:#f92672">=</span> section_name_string_table[hdr.sh_name..];
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (Validator.isSymbolTable(hdr, name)) symbol_table_index <span style="color:#f92672">=</span> i;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (Validator.isStringTable(hdr, name)) string_table_index <span style="color:#f92672">=</span> i;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (symbol_table_index <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#66d9ef">or</span> string_table_index <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">error</span>.CouldNotFindTableIndices;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> .{
+</span></span><span style="display:flex;"><span>        .symbol_table_index <span style="color:#f92672">=</span> symbol_table_index,
+</span></span><span style="display:flex;"><span>        .string_table_index <span style="color:#f92672">=</span> string_table_index,
+</span></span><span style="display:flex;"><span>        .section_name_string_table_index <span style="color:#f92672">=</span> section_name_string_table_index,
+</span></span><span style="display:flex;"><span>    };
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We loop over all of the headers in the section header list and stop if we&rsquo;ve located the symbol and string table headers, or if we&rsquo;ve gone through all the headers and found neither. We test each header and it&rsquo;s name to see if it is either the symbol table (named &ldquo;.symtab&rdquo;) or the string table (named &ldquo;.strtab&rdquo;) header. We then return a structure containing all of the relevant header indices (or an error if they could not be found).</p>
+<p>Back in our <code>ElfInfo.init</code> function, we can retrieve the symbol and string tables like so:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span>    ...
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> table_indices <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> ElfTableIndices.init(n_section_headers, section_headers, section_name_string_table, section_name_string_table_index);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> symbol_table_header <span style="color:#f92672">=</span> section_headers[table_indices.symbol_table_index];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> n_symbols <span style="color:#f92672">=</span> @divExact(symbol_table_header.sh_size, symbol_table_header.sh_entsize);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> symbol_table <span style="color:#f92672">=</span> sliceAtOffset(elf.Elf64_Sym, bytes, symbol_table_header.sh_offset, n_symbols);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> string_table_header <span style="color:#f92672">=</span> section_headers[table_indices.string_table_index];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> string_table <span style="color:#f92672">=</span> bytes[string_table_header.sh_offset..];
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Brief note on the <code>n_symbols</code> calculation: <code>sh_size</code> contains the size of the entire symbol table, and <code>sh_entsize</code> is the size of a single section entry, so dividing the two gives us the number of symbols in the symbol table.</p>
+<p>Amazing! Now that we&rsquo;ve retrieved all the relevant headers, tables, and indices, we can finally finish up our init function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-zig" data-lang="zig"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> init(allocator<span style="color:#f92672">:</span> std.mem.Allocator, path<span style="color:#f92672">:</span> []<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">u8</span>) <span style="color:#f92672">!</span>ElfInfo {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> fd <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fs.cwd().openFile(path, .{});
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> fd.close();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> stat <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fd.stat();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> bytes <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> allocator.alloc(<span style="color:#66d9ef">u8</span>, stat.size);
+</span></span><span style="display:flex;"><span>    _ <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> fd.readAll(bytes);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> elf_header <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> elf.Header.read(fd);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">var</span> section_headers <span style="color:#f92672">=</span> sliceAtOffset(elf.Elf64_Shdr, bytes, elf_header.shoff, elf_header.shnum);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> initial_section_header <span style="color:#f92672">=</span> section_headers[<span style="color:#ae81ff">0</span>];
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> n_section_headers <span style="color:#f92672">=</span> <span style="color:#66d9ef">if</span> (elf_header.shnum <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) initial_section_header.sh_size <span style="color:#66d9ef">else</span> elf_header.shnum;
+</span></span><span style="display:flex;"><span>    section_headers.len <span style="color:#f92672">=</span> n_section_headers;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table_index <span style="color:#f92672">=</span> <span style="color:#66d9ef">if</span> (elf_header.shstrndx <span style="color:#f92672">==</span> <span style="color:#ae81ff">0xffff</span>) initial_section_header.sh_link <span style="color:#66d9ef">else</span> elf_header.shstrndx;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table_header <span style="color:#f92672">=</span> section_headers[section_name_string_table_index];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_name_string_table <span style="color:#f92672">=</span> bytes[section_name_string_table_header.sh_offset..];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> table_indices <span style="color:#f92672">=</span> <span style="color:#66d9ef">try</span> ElfTableIndices.init(n_section_headers, section_headers, section_name_string_table, section_name_string_table_index);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> symbol_table_header <span style="color:#f92672">=</span> section_headers[table_indices.symbol_table_index];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> n_symbols <span style="color:#f92672">=</span> @divExact(symbol_table_header.sh_size, symbol_table_header.sh_entsize);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> symbol_table <span style="color:#f92672">=</span> sliceAtOffset(elf.Elf64_Sym, bytes, symbol_table_header.sh_offset, n_symbols);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> string_table_header <span style="color:#f92672">=</span> section_headers[table_indices.string_table_index];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> string_table <span style="color:#f92672">=</span> bytes[string_table_header.sh_offset..];
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> section_table <span style="color:#f92672">=</span> ElfSectionTable{
+</span></span><span style="display:flex;"><span>        .headers <span style="color:#f92672">=</span> section_headers,
+</span></span><span style="display:flex;"><span>        .table_indices <span style="color:#f92672">=</span> table_indices,
+</span></span><span style="display:flex;"><span>        .symbol_table <span style="color:#f92672">=</span> symbol_table,
+</span></span><span style="display:flex;"><span>        .string_table <span style="color:#f92672">=</span> string_table,
+</span></span><span style="display:flex;"><span>        .section_name_string_table <span style="color:#f92672">=</span> section_name_string_table,
+</span></span><span style="display:flex;"><span>    };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> ElfInfo{
+</span></span><span style="display:flex;"><span>        .elf_header <span style="color:#f92672">=</span> elf_header,
+</span></span><span style="display:flex;"><span>        .data <span style="color:#f92672">=</span> bytes,
+</span></span><span style="display:flex;"><span>        .section_table <span style="color:#f92672">=</span> section_table,
+</span></span><span style="display:flex;"><span>        .allocator <span style="color:#f92672">=</span> allocator,
+</span></span><span style="display:flex;"><span>    };
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> deinit(self<span style="color:#f92672">:</span> <span style="color:#f92672">*</span>Self) <span style="color:#66d9ef">void</span> {
+</span></span><span style="display:flex;"><span>    self.allocator.free(self.data);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>I&rsquo;ve taken the liberty to add an accompanying <code>deinit</code> function to clean up the resources we allocated. The full code for the post can be found on my <a href="https://github.com/abm-77/satellite">Github</a>.</p>
+<h1 id="testing">Testing</h1>
+<p>To test our code thus far, we can print out the value <code>table_indices</code> and see if it matches the information listed when we run <code>readelf -S test</code>:</p>
+<p>Running the program:
+<img src="images/table-indices.png" alt="Program Results"></p>
+<p>Running <code>readelf -S test</code>:
+<img src="images/elf-table-indices.png" alt="readelf Results"></p>
+<p>They&rsquo;re a match!</p>
+<h1 id="end-of-part-1">End of Part 1</h1>
+<p>Ok, that was a lot! But now we can perform a look up on any arbitrary ELF section within a file. For digestability, I will be breaking this post up into (at least) 2 separate posts. The next post will talk about how we can leverage the code we just wrote along with <code>std.dwarf</code> to get actual debug information out of the file. Thank you for tuning in!</p>
+<h1 id="resources">Resources</h1>
+<p>Some of these are more about general debuggers than ELF and DWARF but they helped me while researching this topic:</p>
+<ul>
+<li><a href="https://flint.cs.yale.edu/cs422/doc/ELF_Format.pdf">https://flint.cs.yale.edu/cs422/doc/ELF_Format.pdf</a></li>
+<li><a href="https://dwarfstd.org/doc/DWARF5.pdf">https://dwarfstd.org/doc/DWARF5.pdf</a></li>
+<li><a href="https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1">https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1</a></li>
+<li><a href="https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/">https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/</a></li>
+<li><a href="https://www.timdbg.com/posts/writing-a-debugger-from-scratch-part-1/">https://www.timdbg.com/posts/writing-a-debugger-from-scratch-part-1/</a></li>
+</ul>
+
+  </div>
+</article>
+
+      <footer>
+        <hr>
+        <small>
+          &copy; 2024 .
+        </small>
+      </footer>
+    </div> 
+
+    
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+  </body>
+</html>
+

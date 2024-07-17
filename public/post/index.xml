@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on abm-77</title>
+    <link>http://localhost:1313/post/</link>
+    <description>Recent content in Posts on abm-77</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 20 Jun 2024 22:45:01 -0400</lastBuildDate>
+    <atom:link href="http://localhost:1313/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Howdy, world!</title>
+      <link>http://localhost:1313/post/howdy-world/</link>
+      <pubDate>Thu, 20 Jun 2024 22:45:01 -0400</pubDate>
+      <guid>http://localhost:1313/post/howdy-world/</guid>
+      <description>Howdy, world. My name is Bryson Miller, and this is my personal website. Here I will be discussing topics that interest me in the fields of programming, music, and health/wellness.</description>
+    </item>
+  </channel>
+</rss>

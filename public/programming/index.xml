@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Programmings on abm</title>
+    <link>http://localhost:1313/programming/</link>
+    <description>Recent content in Programmings on abm</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 16 Jul 2024 18:39:15 -0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/programming/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Parsing Elf and Dwarf Files on Linux with the Zig Standard Library: Part 1</title>
+      <link>http://localhost:1313/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</link>
+      <pubDate>Tue, 16 Jul 2024 18:39:15 -0700</pubDate>
+      <guid>http://localhost:1313/programming/parsing-elf-and-dwarf-files-on-linux-with-the-zig-standard-library-part1/</guid>
+      <description>Background Recently, I&amp;rsquo;ve been pretty into debuggers. With the recent development of the RAD Debugger Project, RemedyBG&amp;rsquo;s continued existence, and smaller projects like Spray, I became interested in how they work under the hood. So I set out to try to craft a (simple) debugger on my own. Unfortunately, I decided to start at the harder part of crafting a debugger, parsing ELF and DWARF. Ok, to be fair, they are not ESPECIALLY difficult, but there is a severe lack of resources available on the subject (please correct me if I&amp;rsquo;m wrong here).</description>
+    </item>
+    <item>
+      <title>The Tmux Guide I Wish I Had</title>
+      <link>http://localhost:1313/programming/the-tmux-guide-i-wish-i-had/</link>
+      <pubDate>Fri, 12 Jul 2024 23:32:15 -0700</pubDate>
+      <guid>http://localhost:1313/programming/the-tmux-guide-i-wish-i-had/</guid>
+      <description>GENERAL: tmux: start session exit: leave session&#xA;default prefix key: ctrl-b copy mode: prefix + [ select area to copy: ctrl-v + space&#xA;PANES: contain individual terminal sessions only one active at a time vsplit: ctrl-b + % hsplit: ctrl-b + “ change window: ctrl-b + &amp;lt;up, down, left, right move pane: ctrl-b + { or } select pane by number: ctrl-b + q + [PANE_NUMBER] zoom into pane: ctrl-b + z make pane a window: ctr-b + !</description>
+    </item>
+    <item>
+      <title>Font and SDF Rect Rendering With Zig and WGPU</title>
+      <link>http://localhost:1313/programming/font-and-sdf-rect-rendering-with-zig-and-wgpu/</link>
+      <pubDate>Thu, 20 Jun 2024 23:21:28 -0400</pubDate>
+      <guid>http://localhost:1313/programming/font-and-sdf-rect-rendering-with-zig-and-wgpu/</guid>
+      <description></description>
+    </item>
+  </channel>
+</rss>
